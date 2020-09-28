@@ -16,22 +16,25 @@ import (
 
 // This file contains ASN.1-related methods for String and Builder.
 
-// Builder
 
-// AddASN1Int64 appends a DER-encoded ASN.1 INTEGER.
-func (b *Builder) AddASN1Int64(v int64) {
-	b.addASN1Signed(asn1.INTEGER, v)
+func checkImplicit(tag *asn1.Tag, implicit *asn1.Tag) {
+	if implicit != nil {
+		*tag = *implicit
+	}
 }
 
-// AddASN1Int64WithTag appends a DER-encoded ASN.1 INTEGER with the
-// given tag.
-func (b *Builder) AddASN1Int64WithTag(v int64, tag asn1.Tag) {
+// AddASN1Int64 appends a DER-encoded ASN.1 INTEGER.
+func (b *Builder) AddASN1Int64(v int64, implicit *asn1.Tag) {
+	tag := asn1.INTEGER
+	checkImplicit(&tag, implicit)
 	b.addASN1Signed(tag, v)
 }
 
 // AddASN1Enum appends a DER-encoded ASN.1 ENUMERATION.
-func (b *Builder) AddASN1Enum(v int64) {
-	b.addASN1Signed(asn1.ENUM, v)
+func (b *Builder) AddASN1Enum(v int64, implicit *asn1.Tag) {
+	tag := asn1.ENUM
+	checkImplicit(&tag, implicit)
+	b.addASN1Signed(tag, v)
 }
 
 func (b *Builder) addASN1Signed(tag asn1.Tag, v int64) {
@@ -49,8 +52,10 @@ func (b *Builder) addASN1Signed(tag asn1.Tag, v int64) {
 }
 
 // AddASN1Uint64 appends a DER-encoded ASN.1 INTEGER.
-func (b *Builder) AddASN1Uint64(v uint64) {
-	b.AddASN1(asn1.INTEGER, func(c *Builder) {
+func (b *Builder) AddASN1Uint64(v uint64, implicit *asn1.Tag) {
+	tag := asn1.INTEGER
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(c *Builder) {
 		length := 1
 		for i := v; i >= 0x80; i >>= 8 {
 			length++
@@ -64,12 +69,13 @@ func (b *Builder) AddASN1Uint64(v uint64) {
 }
 
 // AddASN1BigInt appends a DER-encoded ASN.1 INTEGER.
-func (b *Builder) AddASN1BigInt(n *big.Int) {
+func (b *Builder) AddASN1BigInt(n *big.Int, implicit *asn1.Tag) {
 	if b.err != nil {
 		return
 	}
-
-	b.AddASN1(asn1.INTEGER, func(c *Builder) {
+	tag := asn1.INTEGER
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(c *Builder) {
 		if n.Sign() < 0 {
 			// A negative number has to be converted to two's-complement form. So we
 			// invert and subtract 1. If the most-significant-bit isn't set then
@@ -81,7 +87,7 @@ func (b *Builder) AddASN1BigInt(n *big.Int) {
 			for i := range bytes {
 				bytes[i] ^= 0xff
 			}
-			if len(bytes) == 0 || bytes[0]&0x80 == 0 {
+			if bytes[0]&0x80 == 0 {
 				c.add(0xff)
 			}
 			c.add(bytes...)
@@ -98,8 +104,10 @@ func (b *Builder) AddASN1BigInt(n *big.Int) {
 }
 
 // AddASN1OctetString appends a DER-encoded ASN.1 OCTET STRING.
-func (b *Builder) AddASN1OctetString(bytes []byte) {
-	b.AddASN1(asn1.OCTET_STRING, func(c *Builder) {
+func (b *Builder) AddASN1OctetString(bytes []byte, implicit *asn1.Tag) {
+	tag := asn1.OCTET_STRING
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(c *Builder) {
 		c.AddBytes(bytes)
 	})
 }
@@ -107,22 +115,50 @@ func (b *Builder) AddASN1OctetString(bytes []byte) {
 const generalizedTimeFormatStr = "20060102150405Z0700"
 
 // AddASN1GeneralizedTime appends a DER-encoded ASN.1 GENERALIZEDTIME.
-func (b *Builder) AddASN1GeneralizedTime(t time.Time) {
+func (b *Builder) AddASN1GeneralizedTime(t time.Time, implicit *asn1.Tag) {
 	if t.Year() < 0 || t.Year() > 9999 {
 		b.err = fmt.Errorf("cryptobyte: cannot represent %v as a GeneralizedTime", t)
 		return
 	}
-	b.AddASN1(asn1.GeneralizedTime, func(c *Builder) {
+	tag := asn1.GeneralizedTime
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(c *Builder) {
 		c.AddBytes([]byte(t.Format(generalizedTimeFormatStr)))
 	})
 }
 
 // AddASN1BitString appends a DER-encoded ASN.1 BIT STRING. This does not
 // support BIT STRINGs that are not a whole number of bytes.
-func (b *Builder) AddASN1BitString(data []byte) {
-	b.AddASN1(asn1.BIT_STRING, func(b *Builder) {
+func (b *Builder) AddASN1BitString(data []byte, implicit *asn1.Tag) {
+	tag := asn1.BIT_STRING
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(b *Builder) {
 		b.AddUint8(0)
 		b.AddBytes(data)
+	})
+}
+
+func (b *Builder) AddASN1IA5String(data string, implicit *asn1.Tag) {
+	tag := asn1.Tag(22)
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(b *Builder) {
+		b.AddBytes([]byte(data))
+	})
+}
+
+func (b *Builder) AddASN1PrintableString(data string, implicit *asn1.Tag) {
+	tag := asn1.Tag(19)
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(b *Builder) {
+		b.AddBytes([]byte(data))
+	})
+}
+
+func (b *Builder) AddASN1UTF8String(data string, implicit *asn1.Tag) {
+	tag := asn1.Tag(12)
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(b *Builder) {
+		b.AddBytes([]byte(data))
 	})
 }
 
@@ -165,8 +201,10 @@ func isValidOID(oid encoding_asn1.ObjectIdentifier) bool {
 	return true
 }
 
-func (b *Builder) AddASN1ObjectIdentifier(oid encoding_asn1.ObjectIdentifier) {
-	b.AddASN1(asn1.OBJECT_IDENTIFIER, func(b *Builder) {
+func (b *Builder) AddASN1ObjectIdentifier(oid encoding_asn1.ObjectIdentifier, implicit *asn1.Tag) {
+	tag := asn1.OBJECT_IDENTIFIER
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(b *Builder) {
 		if !isValidOID(oid) {
 			b.err = fmt.Errorf("cryptobyte: invalid OID: %v", oid)
 			return
@@ -179,8 +217,10 @@ func (b *Builder) AddASN1ObjectIdentifier(oid encoding_asn1.ObjectIdentifier) {
 	})
 }
 
-func (b *Builder) AddASN1Boolean(v bool) {
-	b.AddASN1(asn1.BOOLEAN, func(b *Builder) {
+func (b *Builder) AddASN1Boolean(v bool, implicit *asn1.Tag) {
+	tag := asn1.BOOLEAN
+	checkImplicit(&tag, implicit)
+	b.AddASN1(tag, func(b *Builder) {
 		if v {
 			b.AddUint8(0xff)
 		} else {
@@ -230,12 +270,12 @@ func (b *Builder) AddASN1(tag asn1.Tag, f BuilderContinuation) {
 
 // String
 
-// ReadASN1Boolean decodes an ASN.1 BOOLEAN and converts it to a boolean
+// ReadASN1Boolean decodes an ASN.1 INTEGER and converts it to a boolean
 // representation into out and advances. It reports whether the read
 // was successful.
 func (s *String) ReadASN1Boolean(out *bool) bool {
 	var bytes String
-	if !s.ReadASN1(&bytes, asn1.BOOLEAN) || len(bytes) != 1 {
+	if !s.ReadASN1(&bytes, asn1.INTEGER) || len(bytes) != 1 {
 		return false
 	}
 

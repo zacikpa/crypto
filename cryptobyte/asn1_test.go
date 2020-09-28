@@ -173,7 +173,7 @@ func TestReadASN1IntegerSigned(t *testing.T) {
 			}
 
 			var b Builder
-			b.AddASN1Int64WithTag(test.out, tag)
+			b.AddASN1Int64(test.out, &tag)
 			result, err := b.Bytes()
 
 			if err != nil {
@@ -259,7 +259,7 @@ func TestASN1ObjectIdentifier(t *testing.T) {
 		}
 
 		var b Builder
-		b.AddASN1ObjectIdentifier(out)
+		b.AddASN1ObjectIdentifier(out, nil)
 		result, err := b.Bytes()
 		if builderOk := err == nil; test.ok != builderOk {
 			t.Errorf("#%d: error from Builder.Bytes: %s", i, err)
@@ -339,7 +339,7 @@ func TestReadASN1BitString(t *testing.T) {
 func TestAddASN1BigInt(t *testing.T) {
 	x := big.NewInt(-1)
 	var b Builder
-	b.AddASN1BigInt(x)
+	b.AddASN1BigInt(x, nil)
 	got, err := b.Bytes()
 	if err != nil {
 		t.Fatalf("unexpected error adding -1: %v", err)
@@ -372,3 +372,4 @@ func TestReadASN1Boolean(t *testing.T) {
 		}
 	}
 }
+
